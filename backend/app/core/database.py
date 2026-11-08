@@ -14,6 +14,9 @@ if database_url.startswith("postgres://"):
 elif database_url.startswith("postgresql://"):
     database_url = database_url.replace("postgresql://", "postgresql+asyncpg://", 1)
 
+if "?sslmode=" in database_url:
+    database_url = database_url.replace("sslmode=disable", "ssl=false").replace("sslmode=require", "ssl=require")
+
 is_sqlite = database_url.startswith("sqlite")
 engine_kwargs = {}
 if is_sqlite:

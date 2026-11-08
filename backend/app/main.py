@@ -3,8 +3,25 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
+from contextlib import asynccontextmanager
+from sqlalchemy import text
 from app.core.config import settings
+from app.core.database import Base, engine
 from app.api.v1.api import api_router
+
+startup_database_error = None
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    global startup_database_error
+    try:
+        async with engine.begin() as connection:
+            await connection.run_sync(Base.metadata.create_all)
+    except Exception as exc:
+        startup_database_error = type(exc).__name__
+    yield
+
 
 app = FastAPI(
     title=settings.APP_NAME,
@@ -13,6 +30,7 @@ app = FastAPI(
     openapi_url=f"{settings.API_V1_STR}/openapi.json",
     docs_url=f"{settings.API_V1_STR}/docs",
     redoc_url=f"{settings.API_V1_STR}/redoc",
+    lifespan=lifespan,
 )
 
 # CORS configuration
@@ -28,9 +46,30 @@ app.add_middleware(
 app.include_router(api_router, prefix=settings.API_V1_STR)
 
 
+async def database_health():
+    try:
+        async with engine.connect() as connection:
+            await connection.execute(text("SELECT 1"))
+        database = "connected"
+    except Exception as exc:
+        database = "unavailable"
+        return {"status": "degraded", "app": settings.APP_NAME, "env": settings.APP_ENV, "database": database, "database_error_type": type(exc).__name__, "startup_database_error": startup_database_error}
+    return {"status": "ok", "app": settings.APP_NAME, "env": settings.APP_ENV, "database": database, "startup_database_error": startup_database_error}
+
+
 @app.get("/health")
-def health():
-    return {"status": "ok", "app": settings.APP_NAME, "env": settings.APP_ENV}
+async def health():
+    return await database_health()
+
+
+@app.get("/api/health")
+async def api_health():
+    return await database_health()
+
+
+@app.get("/api/v1/health/database")
+async def api_database_health():
+    return await database_health()
 
 
 # Serve React frontend build when available
