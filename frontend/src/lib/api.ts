@@ -1,6 +1,7 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || '';
+const configuredApiUrl = String(import.meta.env.VITE_API_URL || '').replace(/\/$/, '').replace(/\/api\/v1$/, '');
+const API_BASE_URL = configuredApiUrl;
 
 export const api = axios.create({
   baseURL: API_BASE_URL,
@@ -67,7 +68,7 @@ api.interceptors.response.use(
       }
 
       try {
-        const response = await axios.post(`${API_BASE_URL}/api/v1/auth/refresh`, {
+        const response = await api.post('/api/v1/auth/refresh', {
           refresh_token: refreshToken,
         });
 

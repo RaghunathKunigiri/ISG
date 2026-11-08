@@ -19,6 +19,7 @@ coverage/
 # Build and tooling
 .idea/
 .vscode/
+.vercel/
 *.log
 *.xlsx
 .DS_Store

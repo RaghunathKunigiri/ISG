@@ -4,20 +4,25 @@ from typing import AsyncGenerator
 from sqlalchemy import DateTime, String
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+from sqlalchemy.pool import NullPool
 from app.core.config import settings
 
-# Engine configuration
-# If using SQLite for testing, check_same_thread=False
-is_sqlite = settings.DATABASE_URL.startswith("sqlite")
+# Normalize common hosted PostgreSQL URLs and avoid persistent connection pools in serverless functions.
+database_url = settings.DATABASE_URL
+if database_url.startswith("postgres://"):
+    database_url = database_url.replace("postgres://", "postgresql+asyncpg://", 1)
+elif database_url.startswith("postgresql://"):
+    database_url = database_url.replace("postgresql://", "postgresql+asyncpg://", 1)
+
+is_sqlite = database_url.startswith("sqlite")
 engine_kwargs = {}
 if is_sqlite:
     engine_kwargs["connect_args"] = {"check_same_thread": False}
 else:
     engine_kwargs["pool_pre_ping"] = True
-    engine_kwargs["pool_size"] = 20
-    engine_kwargs["max_overflow"] = 10
+    engine_kwargs["poolclass"] = NullPool
 
-engine = create_async_engine(settings.DATABASE_URL, **engine_kwargs)
+engine = create_async_engine(database_url, **engine_kwargs)
 async_session_factory = async_sessionmaker(
     bind=engine,
     autocommit=False,
