@@ -5,6 +5,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from contextlib import asynccontextmanager
 from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
 from app.core.config import settings
 from app.core.database import Base, engine
 from app.api.v1.api import api_router
@@ -41,6 +42,13 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.exception_handler(SQLAlchemyError)
+async def database_exception_handler(request, exc):
+    from fastapi.responses import JSONResponse
+    return JSONResponse(status_code=503, content={"detail": "Database is unavailable"})
+
 
 # API v1 Router
 app.include_router(api_router, prefix=settings.API_V1_STR)
